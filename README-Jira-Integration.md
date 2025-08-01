@@ -31,7 +31,7 @@ Este sistema permite:
    # Agregar al final de ~/.zshrc
    echo "
    # Jira API Configuration for KYC Enforcement
-   export JIRA_BASE_URL=\"https://mercadolibre.atlassian.net\"
+   export JIRA_BASE_URL=\"https://.....atlassian.net\"
    export JIRA_EMAIL=\"YOUR_CORPORATE_EMAIL\"
    export JIRA_API_TOKEN=\"YOUR_GENERATED_TOKEN\"
    # JIRA_PROJECT_KEY se consulta dinámicamente en cada creación" >> ~/.zshrc
@@ -263,7 +263,7 @@ Flow:
 
 ### **Variables de Entorno**
 ```bash
-JIRA_BASE_URL     # https://mercadolibre.atlassian.net
+JIRA_BASE_URL     # https://....atlassian.net
 JIRA_EMAIL        # Tu email corporativo
 JIRA_API_TOKEN    # Token generado en Atlassian
 # JIRA_PROJECT_KEY se consulta dinámicamente
