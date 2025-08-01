@@ -1,0 +1,1133 @@
+---
+description: Integration with Jira REST API v3 for creating tickets from development tasks
+globs: *.mdc
+---
+
+# Jira API Integration Assistant
+
+<version>2.7.0</version>
+
+## Context
+- Direct integration with Jira Cloud REST API v3 for ticket creation
+- Follows KYC Enforcement project patterns and 9001-jira-task-generator format
+- Uses Atlassian authentication for private repositories
+- Can be invoked automatically from 9001-jira-task-generator after .md file generation
+- Creates complete descriptions with all required sections (¿Qué?, ¿Cómo?, ¿Por qué?, Dependencias)
+- Includes acceptance criteria as structured section in description using ADF format
+- Converts Jira ticket references in dependencies to clickable links
+- Automated .zshrc configuration with user confirmation before applying changes
+
+## API Configuration
+
+### Base Configuration
+- **Base URL**: `https://mercadolibre.atlassian.net/rest/api/3/`
+- **Authentication**: API Token or OAuth 2.0
+- **Required Scopes**: `write:jira-work` (Classic) or `write:issue:jira` (Granular)
+
+### Authentication Methods
+
+#### Option 1: API Token (Recommended for private repos)
+```bash
+# Create base64 encoded token
+echo -n "YOUR_EMAIL:YOUR_API_TOKEN" | base64
+```
+
+#### Option 2: OAuth 2.0 (For apps)
+```bash
+# Use OAuth flow for production integrations
+curl -X POST https://auth.atlassian.com/oauth/token
+```
+
+## API Endpoints
+
+### 1. Create Single Issue
+**Endpoint**: `POST /rest/api/3/issue`
+
+```json
+{
+  "fields": {
+    "project": {
+      "key": "KYC-ENF"
+    },
+    "summary": "Ticket title",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Ticket description"
+            }
+          ]
+        }
+      ]
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "priority": {
+      "name": "High"
+    },
+    "labels": ["backend", "go", "kyc"]
+  }
+}
+```
+
+### 2. Task Creation Options
+
+**Option 1: Parent Story + Associated Sub-tasks**
+- Create parent Story with overview/summary
+- Create individual Sub-tasks linked to parent Story (use "Sub-task" type, not "Task")
+- Parent provides context, sub-tasks contain specific work
+
+**Option 2: Direct Story Creation**
+- Create single Story with all content
+- Self-contained work item
+- No parent-child relationships
+
+### 3. Get Project Metadata
+**Endpoint**: `GET /rest/api/3/issue/createmeta`
+
+Query parameters:
+- `projectKeys=KYC-ENF`
+- `expand=projects.issuetypes.fields`
+
+## Markdown File Requirements
+
+### Expected .md File Structure (9001-jira-task-generator format)
+
+```markdown
+# Ticket JIRA: [Task Title]
+
+## ¿Qué hay que hacer?
+[Clear, specific description]
+
+## ¿Cómo se va a hacer?
+- [Technical step 1]
+- [Technical step 2]
+
+## ¿Por qué se va a hacer?
+[Business justification]
+
+## Dependencias
+- [Dependency 1]
+- [Dependency 2]
+
+## DoD (Definition of Done)
+- [ ] [Acceptance criteria 1]
+- [ ] [Acceptance criteria 2]
+
+---
+```
+
+### Validation Rules
+
+Before processing, verify:
+- ✅ File has all required sections
+- ✅ Sections contain meaningful content (not placeholders)
+- ✅ DoD has checkboxes with specific criteria
+- ✅ Technical steps are detailed and actionable
+- ❌ No time estimations included
+- ❌ No vague descriptions
+
+## Implementation Patterns
+
+### Pattern 0: Automatic Integration from 9001-jira-task-generator
+
+When triggered automatically from 9001 after .md file generation:
+
+**Seamless Workflow:**
+1. User generates .md file using 9001-jira-task-generator
+2. 9001 offers: "¿Deseas crear estos tickets en Jira ahora?"
+3. If user accepts → Automatically execute 9002 workflow:
+   - Skip Step 1 (file already provided)
+   - Continue with environment check, format selection, project selection
+   - Execute ticket creation
+
+### Pattern 1: Manual Single Ticket Creation
+
+When user requests: *"Crear ticket JIRA para implementar circuit breaker en enforcement"*
+
+**Step 0**: Check environment variables (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN)
+- If missing, guide user through configuration setup
+- If present, validate token with API call to /myself endpoint
+**Step 0.1**: Token validation
+- If token valid (HTTP 200), continue
+- If token invalid (HTTP 401/403), guide through token regeneration process
+**Step 1**: Request .md file: "Por favor proporciona el archivo .md con la definición de la tarea (formato 9001-jira-task-generator)"
+**Step 2**: Validate .md file structure and content
+**Step 3**: Ask for format: "¿Cómo deseas crear la tarea?
+   - Opción 1: Historia padre + sub-tasks asociadas
+   - Opción 2: Story individual directa"
+**Step 4**: Ask for project key: "¿Para qué proyecto? (ej: KYCSERVENF, PAYMENTS, USERS)"
+**Step 5**: Parse .md content and convert to Jira API format (no assignee, no epic, ADF format)
+   - Include all sections: ¿Qué?, ¿Cómo?, ¿Por qué?, Dependencias
+   - Convert DoD items to Acceptance Criteria field
+   - Convert Jira ticket references in dependencies to clickable links
+**Step 6**: Execute Jira API call with specified project and format
+**Step 7**: Ask user about .md file cleanup (keep or delete)
+
+```bash
+curl -X POST \
+  'https://your-domain.atlassian.net/rest/api/3/issue' \
+  -H 'Authorization: Basic [BASE64_TOKEN]' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYC-ENF"},
+      "summary": "Implementar circuit breaker en HTTPRestrictionsRepository",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+          },
+          {
+            "type": "paragraph", 
+            "content": [{"type": "text", "text": "Implementar circuit breaker pattern en internal/domain/enforcement/repository/restriction.go para mejorar la resiliencia del sistema ante fallas del servicio externo"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Cómo se va a hacer?"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Modificar HTTPRestrictionsRepository para usar circuit breaker"}]}]
+              },
+              {
+                "type": "listItem", 
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Configurar thresholds en developconfiguration.go"}]}]
+              },
+              {
+                "type": "listItem", 
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Implementar fallback logic para contingencia"}]}]
+              },
+              {
+                "type": "listItem", 
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Agregar tests unitarios e integración"}]}]
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Mejorar la resiliencia del sistema ante fallas del servicio externo de restricciones, evitando timeouts y degradación del servicio"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "Dependencias"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Configuración de circuit breaker implementada"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-123: Implementar contingency service", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-123"}}]}]}]
+              }
+            ]
+          }
+        ]
+      },
+      # Note: Acceptance criteria included in description as "Criterios de Aceptación" section
+      "issuetype": {"name": "Story"},
+      "priority": {"name": "High"},
+      "labels": ["backend", "go", "resilience", "enforcement"],
+      "components": [{"name": "Backend"}]
+    }
+  }'
+```
+
+### Pattern 2: Parent Story + Associated Tasks Format
+
+When user selects "Opción 1: Historia padre + tasks asociadas":
+
+**Implementation**:
+1. Create parent Story with complete description (all sections: ¿Qué?, ¿Por qué?, Dependencias) and global DoD as Acceptance Criteria
+2. Create individual Sub-tasks for each item in "¿Cómo se va a hacer?" section with specific descriptions and task-level acceptance criteria
+3. Link Sub-tasks to parent Story using `parent` field
+4. Convert Jira ticket references in dependencies to clickable links
+
+```bash
+# 1. Create Parent Story (Complete description with all sections)
+curl -X POST \
+  'https://mercadolibre.atlassian.net/rest/api/3/issue' \
+  -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYCSERVENF"},
+      "summary": "[EPIC] Implementar circuit breaker en HTTPRestrictionsRepository",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+          },
+          {
+            "type": "paragraph", 
+            "content": [{"type": "text", "text": "Implementar circuit breaker pattern en internal/domain/enforcement/repository/restriction.go para mejorar la resiliencia del sistema ante fallas del servicio externo"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Mejorar la resiliencia del sistema ante fallas del servicio externo de restricciones, evitando timeouts y degradación del servicio"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "Dependencias"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Configuración de circuit breaker implementada"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-123: Implementar contingency service", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-123"}}]}]}]
+              }
+            ]
+          }
+        ]
+      },
+      # Note: Acceptance criteria included in description as "Criterios de Aceptación" section
+      "issuetype": {"name": "Story"},
+      "priority": {"name": "High"},
+      "labels": ["backend", "go", "resilience", "epic"]
+    }
+  }'
+
+# 2. Create Associated Sub-tasks (IMPORTANT: Use "Sub-task", not "Task")
+curl -X POST \
+  'https://mercadolibre.atlassian.net/rest/api/3/issue' \
+  -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYCSERVENF"},
+      "parent": {"key": "KYCSERVENF-PARENT-KEY"},
+      "summary": "Modificar HTTPRestrictionsRepository para usar circuit breaker",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Modificar la implementación de HTTPRestrictionsRepository en internal/domain/enforcement/repository/restriction.go para integrar circuit breaker pattern"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Cómo se va a hacer?"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Wrappear las llamadas HTTP con circuit breaker"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Configurar timeout y retry policies"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Implementar fallback logic para errores"}]}]
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Evitar que fallas del servicio externo causen timeouts y errores en cadena en el sistema de enforcement"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "Dependencias"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Circuit breaker configuration disponible"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-124: Setup circuit breaker config", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-124"}}]}]}]
+              }
+            ]
+          }
+        ]
+      },
+      # Note: Acceptance criteria included in description as "Criterios de Aceptación" section
+      "issuetype": {"name": "Sub-task"},
+      "priority": {"name": "Medium"},
+      "labels": ["backend", "go", "circuit-breaker"]
+    }
+  }'
+```
+
+## Error Handling
+
+### Common HTTP Status Codes
+- **201 Created**: Issue created successfully
+- **400 Bad Request**: Invalid request format or missing required fields
+- **401 Unauthorized**: Authentication failed
+- **403 Forbidden**: User lacks permissions
+- **404 Not Found**: Project or issue type not found
+
+### Specific Error Messages Found in Testing
+
+#### Hierarchy Error
+```json
+{"errorMessages":[],"errors":{"parentId":"La actividad principal no corresponde a la jerarquía adecuada."}}
+```
+**Solution**: Use "Sub-task" instead of "Task" when creating child issues
+
+#### Description Format Error  
+```json
+{"errorMessages":[],"errors":{"description":"El valor de la operación debe ser un documento de Atlassian (consulta el formato de los documentos de Atlassian)"}}
+```
+**Solution**: Always use ADF (Atlassian Document Format) for descriptions, never plain text
+
+### Required ADF Format for Descriptions
+
+Always use this structure for description field with all required sections:
+```json
+{
+  "description": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {"level": 3},
+        "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+      },
+      {
+        "type": "paragraph",
+        "content": [{"type": "text", "text": "Clear description of what needs to be done"}]
+      },
+      {
+        "type": "heading",
+        "attrs": {"level": 3},
+        "content": [{"type": "text", "text": "¿Cómo se va a hacer?"}]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Step 1"}]}]
+          },
+          {
+            "type": "listItem",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Step 2"}]}]
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {"level": 3},
+        "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+      },
+      {
+        "type": "paragraph",
+        "content": [{"type": "text", "text": "Business justification and value"}]
+      },
+      {
+        "type": "heading",
+        "attrs": {"level": 3},
+        "content": [{"type": "text", "text": "Dependencias"}]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Regular dependency"}]}]
+          },
+          {
+            "type": "listItem",
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-123: Linked ticket description", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-123"}}]}]}]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Acceptance Criteria Implementation
+
+**Strategy**: Include acceptance criteria as a structured section in the description using ADF format, as custom fields may not be available in all Jira configurations.
+
+```json
+{
+  "type": "heading",
+  "attrs": {"level": 3},
+  "content": [{"type": "text", "text": "Criterios de Aceptación"}]
+},
+{
+  "type": "bulletList",
+  "content": [
+    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Specific, measurable acceptance criteria 1"}]}]},
+    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Specific, measurable acceptance criteria 2"}]}]},
+    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Specific, measurable acceptance criteria 3"}]}]}
+  ]
+}
+```
+
+**Note**: DoD items from .md files should be converted to this description section format. If custom acceptance criteria fields are available in your Jira instance, they can be used instead.
+
+### Dependency Links Processing
+
+When processing dependencies from .md files:
+1. **Regular dependencies**: Add as plain text bullets
+2. **Jira ticket references**: Detect patterns like "PROJECTKEY-123", "PROJECT-456: Description" 
+3. **Convert to links**: Format as clickable links using ADF link format:
+   ```json
+   {
+     "type": "text",
+     "text": "KYCSERVENF-123: Description",
+     "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-123"}}]
+   }
+   ```
+
+### Response Validation
+```json
+// Success Response
+{
+  "id": "10000",
+  "key": "KYC-ENF-123", 
+  "self": "https://your-domain.atlassian.net/rest/api/3/issue/10000"
+}
+
+// Error Response
+{
+  "errorMessages": [],
+  "errors": {
+    "project": "project is required"
+  }
+}
+```
+
+## Usage Examples
+
+### Example 1: Create Development Task with Token Validation
+```
+User: "Crear ticket JIRA para implementar validación de input en enforcement handler"
+
+Assistant Response:
+1. ✅ Variables de entorno encontradas
+2. 🔍 Verificando validez del token...
+   - Llamada a /rest/api/3/myself
+   - Si HTTP 200 → ✅ Token válido, continuando...
+   - Si HTTP 401/403 → ❌ Token inválido, iniciando proceso de regeneración
+3. "Por favor proporciona el archivo .md con la definición de la tarea (formato 9001-jira-task-generator)"
+4. ✅ Archivo .md validado
+5. "¿Cómo deseas crear la tarea? Opción 1: Historia padre + sub-tasks, Opción 2: Story individual directa"
+6. "¿Para qué proyecto deseas crear el ticket? (ej: KYCSERVENF, PAYMENTS, USERS)"
+7. Parseo contenido .md y convierto a formato Jira API (ADF, sin assignee ni epic)
+8. Ejecuto llamadas HTTP según formato seleccionado
+9. "¿Qué deseas hacer con los archivos .md generados? Mantener o eliminar?"
+```
+
+### Example 1.1: Token Invalid Flow
+```
+User: "Crear ticket JIRA para nueva funcionalidad"
+
+Assistant Response:
+1. ✅ Variables de entorno encontradas
+2. 🔍 Verificando validez del token...
+3. ❌ Token inválido o expirado (HTTP 401)
+
+❌ Token de Jira inválido o expirado
+
+Posibles causas:
+- Token expirado (tokens tienen fecha de vencimiento)
+- Token revocado manualmente
+- Credenciales incorrectas
+
+Es necesario generar un nuevo token para continuar.
+
+[Abre página de tokens automáticamente]
+[Guía paso a paso para regenerar token]
+[Actualización de .zshrc]
+[Re-verificación del nuevo token]
+[Continuación del proceso normal]
+```
+
+```bash
+curl -X POST \
+  'https://kyc-enforcement.atlassian.net/rest/api/3/issue' \
+  -H 'Authorization: Basic [TOKEN]' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYC-ENF"},
+      "summary": "Implementar validación de input en enforcement handler",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Agregar validación de parámetros de entrada en enforcement HTTP handler para prevenir errores de runtime"}]
+          },
+          {
+            "type": "heading", 
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Cómo se va a hacer?"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Modificar internal/domain/enforcement/delivery/http.go"}]}]},
+              {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Agregar struct de validación usando go-validator"}]}]},
+              {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Implementar middleware de validación"}]}]},
+              {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Agregar tests para casos válidos e inválidos"}]}]}
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3}, 
+            "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Prevenir errores 500 por input malformado y mejorar experiencia de usuario con errores 400 descriptivos"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "Dependencias"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "go-validator library instalada en go.mod"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-100: Setup validation middleware base", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-100"}}]}]}]
+              }
+            ]
+          }
+        ]
+      },
+      # Note: Acceptance criteria included in description as "Criterios de Aceptación" section
+      "issuetype": {"name": "Story"},
+      "priority": {"name": "Medium"},
+      "labels": ["backend", "go", "validation", "enforcement"],
+      "components": [{"name": "Backend"}]
+    }
+  }'
+```
+
+### Example 2: Format Selection - Parent Story + Tasks
+```
+User: "Crear ticket JIRA desde archivo-circuit-breaker.md usando formato padre + tasks"
+
+Assistant Response:
+1. ✅ Variables de entorno verificadas
+2. ✅ Archivo .md validado
+3. Usuario selecciona: "Opción 1: Historia padre + tasks asociadas"
+4. Usuario especifica proyecto: "KYC-ENF"
+5. Creo historia padre + tasks individuales para cada paso técnico
+```
+
+```bash
+# 1. Create Parent Story (with complete description)
+curl -X POST \
+  'https://mercadolibre.atlassian.net/rest/api/3/issue' \
+  -H 'Authorization: Basic [TOKEN]' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYC-ENF"},
+      "summary": "[Parent] Implementar circuit breaker en HTTPRestrictionsRepository",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Qué hay que hacer?"}]
+          },
+          {
+            "type": "paragraph", 
+            "content": [{"type": "text", "text": "Implementar circuit breaker pattern en HTTPRestrictionsRepository para mejorar resiliencia ante fallas del servicio externo de restricciones"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "¿Por qué se va a hacer?"}]
+          },
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Mejorar la resiliencia del sistema ante fallas del servicio externo de restricciones, evitando timeouts y degradación del servicio"}]
+          },
+          {
+            "type": "heading",
+            "attrs": {"level": 3},
+            "content": [{"type": "text", "text": "Dependencias"}]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Configuración de circuit breaker implementada"}]}]
+              },
+              {
+                "type": "listItem",
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "KYCSERVENF-200: Base circuit breaker config", "marks": [{"type": "link", "attrs": {"href": "https://mercadolibre.atlassian.net/browse/KYCSERVENF-200"}}]}]}]
+              }
+            ]
+          }
+        ]
+      },
+      # Note: Acceptance criteria included in description as "Criterios de Aceptación" section
+      "issuetype": {"name": "Story"},
+      "priority": {"name": "Medium"},
+      "labels": ["backend", "go", "resilience", "enforcement"]
+    }
+  }'
+
+# 2. Create Sub-task 1
+curl -X POST \
+  'https://mercadolibre.atlassian.net/rest/api/3/issue' \
+  -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYCSERVENF"},
+      "parent": {"key": "KYCSERVENF-447"},
+      "summary": "Modificar HTTPRestrictionsRepository para usar circuit breaker",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Specific implementation details for circuit breaker integration"}]
+          }
+        ]
+      },
+      "issuetype": {"name": "Sub-task"},
+      "priority": {"name": "Medium"},
+      "labels": ["backend", "go", "circuit-breaker"]
+    }
+  }'
+
+# 3. Create Sub-task 2
+curl -X POST \
+  'https://mercadolibre.atlassian.net/rest/api/3/issue' \
+  -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "project": {"key": "KYCSERVENF"},
+      "parent": {"key": "KYCSERVENF-447"},
+      "summary": "Configurar thresholds en developconfiguration.go",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Configuration details for circuit breaker thresholds"}]
+          }
+        ]
+      },
+      "issuetype": {"name": "Sub-task"},
+      "priority": {"name": "Medium"},
+      "labels": ["backend", "go", "configuration"]
+    }
+  }'
+```
+
+## Environment Variables Verification
+
+### Pre-execution Check
+Before any ticket creation, verify required environment variables:
+
+```bash
+# Check if all required variables exist
+echo "Checking Jira configuration..."
+if [[ -z "$JIRA_BASE_URL" || -z "$JIRA_EMAIL" || -z "$JIRA_API_TOKEN" ]]; then
+  echo "❌ Missing Jira environment variables"
+  # Guide user through setup
+else
+  echo "✅ Jira configuration found"
+  # Continue with ticket creation
+fi
+```
+
+### Variables Status Check
+```bash
+echo "JIRA_BASE_URL: ${JIRA_BASE_URL:-'❌ Not set'}"
+echo "JIRA_EMAIL: ${JIRA_EMAIL:-'❌ Not set'}"  
+echo "JIRA_API_TOKEN: ${JIRA_API_TOKEN:+✅ Set}"
+```
+
+## Automatic Configuration Setup
+
+### When variables are missing, guide user through setup:
+
+1. **Open API Token page**:
+```bash
+open https://id.atlassian.com/manage-profile/security/api-tokens
+```
+
+2. **Auto-write configuration to .zshrc**:
+```bash
+echo "
+# Jira API Configuration for KYC Enforcement  
+export JIRA_BASE_URL=\"https://mercadolibre.atlassian.net\"
+export JIRA_EMAIL=\"YOUR_CORPORATE_EMAIL\"
+export JIRA_API_TOKEN=\"YOUR_API_TOKEN_HERE\"
+# JIRA_PROJECT_KEY se consulta dinámicamente en cada creación" >> ~/.zshrc
+
+echo "✅ Configuración base agregada a ~/.zshrc"
+```
+
+3. **Open .zshrc for user to customize**:
+```bash
+open ~/.zshrc
+```
+
+4. **Wait for user confirmation**:
+```
+⚠️  Por favor actualiza en el archivo .zshrc que se abrió:
+   - JIRA_EMAIL: Tu email corporativo (@mercadolibre.com)  
+   - JIRA_API_TOKEN: El token generado en Atlassian
+
+¿Ya actualizaste los valores en .zshrc? (escribe "si" para continuar):
+```
+
+5. **After user confirms, reload configuration**:
+```bash
+echo "🔄 Recargando configuración..."
+source ~/.zshrc
+echo "✅ Variables de entorno cargadas"
+```
+
+## Configuration Template
+
+### Environment Variables
+```bash
+# Add to your environment (proyecto se consulta dinámicamente)
+export JIRA_BASE_URL="https://mercadolibre.atlassian.net"
+export JIRA_EMAIL="YOUR_CORPORATE_EMAIL" 
+export JIRA_API_TOKEN="your-api-token"
+# JIRA_PROJECT_KEY se consulta en cada creación
+```
+
+### Cursor Settings
+Add to your `.cursor/mcp.json`:
+```json
+{
+  "jira": {
+    "baseUrl": "${JIRA_BASE_URL}",
+    "email": "${JIRA_EMAIL}",
+    "token": "${JIRA_API_TOKEN}",
+    "defaultIssueType": "Story",
+    "defaultPriority": "Medium",
+    "commonProjects": ["KYC-ENF", "PAYMENTS", "USERS", "SECURITY"]
+  }
+}
+```
+
+## Best Practices
+
+### 1. Ticket Quality
+- **Usar siempre formato de 9001-jira-task-generator** como input base
+- **Descripciones completas**: Incluir TODAS las secciones (¿Qué?, ¿Cómo?, ¿Por qué?, Dependencias) en formato ADF
+- **DoD en descripción**: Incluir criterios de aceptación como sección "Criterios de Aceptación" en la descripción usando formato ADF
+- **Dependencias con links**: Convertir referencias de tickets Jira (ej: KYCSERVENF-123) a links clickeables
+- **Contexto técnico específico**: Incluir detalles de arquitectura hexagonal, Go patterns, etc.
+- **No asignar tickets** (mantener sin assignee)
+- **No asociar a épicas** automáticamente (manejo manual)
+- **Sub-tasks completas**: Cada sub-task debe tener descripción completa con todas las secciones
+
+### 2. API Usage
+- Validar respuesta antes de continuar
+- Implementar retry logic para errores temporales
+- Crear tickets individuales (no bulk operations)
+- Cachear metadatos de proyecto
+
+### 3. Security
+- Nunca commitear tokens en código
+- Usar variables de entorno para credenciales
+- Rotar tokens regularmente
+- Verificar permisos mínimos necesarios
+- **Validar token antes de cada operación**: Siempre verificar validez con /myself endpoint
+- **Manejar tokens expirados**: Guiar al usuario a regenerar tokens automáticamente
+- **Usar nombres descriptivos**: Incluir fecha en nombre de tokens para tracking
+
+### 4. Error Recovery
+```bash
+# Verificar si ticket existe antes de crear
+curl -X GET \
+  'https://your-domain.atlassian.net/rest/api/3/search' \
+  -H 'Authorization: Basic [TOKEN]' \
+  -G \
+  -d 'jql=project="KYC-ENF" AND summary~"[SUMMARY_TEXT]"'
+```
+
+## Integration with GitHub CLI
+
+Since user has GitHub CLI configured [[memory:4042988]], integrate with git workflow:
+
+```bash
+# Create branch and ticket together
+git checkout -b feature/KYC-ENF-123-implement-validation
+# ... create Jira ticket ...
+# Link in commit messages: "KYC-ENF-123: Implement input validation"
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **401 Unauthorized**: Check API token and email
+2. **400 Bad Request**: Validate required fields for issue type
+3. **403 Forbidden**: Verify project permissions
+4. **Rate Limiting**: Implement exponential backoff
+
+### Debug Commands
+```bash
+# Test authentication
+curl -X GET \
+  'https://your-domain.atlassian.net/rest/api/3/myself' \
+  -H 'Authorization: Basic [TOKEN]'
+
+# Get project metadata
+curl -X GET \
+  'https://your-domain.atlassian.net/rest/api/3/project/KYC-ENF' \
+  -H 'Authorization: Basic [TOKEN]'
+```
+
+## Usage Triggers
+
+Activate this rule when user mentions:
+- "crear ticket jira"
+- "jira api" 
+- "generar issue"
+- "ticket desde archivo md"
+- "crear ticket desde archivo"
+- "formato padre + tasks"
+- "story individual"
+- References to 9001-jira-task-generator patterns
+- Provides .md files for ticket creation
+- Automatically triggered from 9001-jira-task-generator when user accepts Jira creation
+
+## Workflow Process
+
+### 1. Environment Variables Check (Always First)
+```bash
+# Step 1: Check if variables exist
+if [[ -z "$JIRA_BASE_URL" || -z "$JIRA_EMAIL" || -z "$JIRA_API_TOKEN" ]]; then
+  echo "⚙️ Configuración de Jira requerida..."
+  # Execute automatic configuration setup
+else
+  echo "✅ Variables de entorno encontradas"
+  
+  # Step 2: Validate token is still valid
+  echo "🔍 Verificando validez del token..."
+  TOKEN_CHECK=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+    "$JIRA_BASE_URL/rest/api/3/myself" \
+    -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)")
+  
+  if [[ "$TOKEN_CHECK" == "200" ]]; then
+    echo "✅ Token válido, continuando..."
+    # Proceed with ticket creation
+  else
+    echo "❌ Token inválido o expirado (HTTP $TOKEN_CHECK)"
+    # Guide user to regenerate token
+  fi
+fi
+```
+
+### 2. Token Regeneration (When Invalid)
+
+When token validation fails, guide user through token renewal:
+
+#### Step 1: Explain the Issue
+```
+❌ Token de Jira inválido o expirado
+
+Posibles causas:
+- Token expirado (tokens tienen fecha de vencimiento)
+- Token revocado manualmente
+- Credenciales incorrectas
+- Permisos insuficientes
+
+Es necesario generar un nuevo token para continuar.
+```
+
+#### Step 2: Open Token Management Page
+```bash
+open https://id.atlassian.com/manage-profile/security/api-tokens
+```
+
+#### Step 3: Guide Token Creation
+```
+En la página que se abrió:
+1. 🗑️  Elimina el token anterior (si existe) "Cursor KYC Enforcement"
+2. ➕ Haz clic en "Create API token"
+3. 📝 Nombre: "Cursor KYC Enforcement - [FECHA_ACTUAL]"
+4. 📋 Copia el nuevo token generado
+```
+
+#### Step 4: Auto-update .zshrc with New Token
+```bash
+# Auto-update existing JIRA_API_TOKEN line in .zshrc
+echo "🔧 Actualizando JIRA_API_TOKEN en ~/.zshrc..."
+
+# Comment out old token line
+sed -i.bak 's/^export JIRA_API_TOKEN=/# OLD_TOKEN: export JIRA_API_TOKEN=/' ~/.zshrc
+
+# Add new token line
+echo "export JIRA_API_TOKEN=\"YOUR_NEW_TOKEN_HERE\"  # Updated $(date +%Y-%m-%d)" >> ~/.zshrc
+
+echo "✅ Línea de token agregada a ~/.zshrc"
+```
+
+#### Step 5: Open .zshrc for user to update token
+```bash
+open ~/.zshrc
+```
+
+#### Step 6: Wait for user confirmation
+```
+⚠️  En el archivo .zshrc que se abrió:
+   - Busca la línea: export JIRA_API_TOKEN="YOUR_NEW_TOKEN_HERE"
+   - Reemplaza YOUR_NEW_TOKEN_HERE con el token que copiaste de Atlassian
+   - Guarda el archivo
+
+¿Ya actualizaste el token en .zshrc? (escribe "si" para continuar):
+```
+
+#### Step 7: Reload and Re-verify
+```bash
+echo "🔄 Recargando configuración..."
+source ~/.zshrc
+
+echo "🔍 Re-verificando nuevo token..."
+TOKEN_CHECK=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+  "$JIRA_BASE_URL/rest/api/3/myself" \
+  -H "Authorization: Basic $(echo -n "$JIRA_EMAIL:$JIRA_API_TOKEN" | base64)")
+
+if [[ "$TOKEN_CHECK" == "200" ]]; then
+  echo "✅ Nuevo token validado correctamente"
+  echo "🎉 Continuando con creación de tickets..."
+  # Continue with ticket creation process
+else
+  echo "❌ El nuevo token sigue sin funcionar. Verificar:"
+  echo "- Email correcto en JIRA_EMAIL"
+  echo "- Token copiado completamente sin espacios"
+  echo "- Permisos de proyecto en Jira"
+  echo "- Formato correcto: sin comillas extras ni espacios"
+fi
+```
+
+### 3. Dynamic Project Selection
+
+Always ask for project key when creating tickets:
+- List common projects: "KYCSERVENF, PAYMENTS, USERS, SECURITY"
+- Allow custom project key input
+- Validate project exists before creating ticket
+- Use project-specific configurations if available
+
+### 4. Markdown File Processing
+- Request .md file(s) from user
+- Validate file structure and content
+- Parse all required sections
+- Verify compliance with 9001-jira-task-generator format
+
+### 5. Format Selection and Creation
+- Ask user to choose format: Parent+Sub-tasks vs Individual Story
+- Convert parsed .md content to appropriate Jira API format
+- Execute creation based on selected format:
+  - Option 1: Create parent Story + individual Sub-tasks (use "Sub-task" type)
+  - Option 2: Create single comprehensive Story
+- No assignee assignment (tickets remain unassigned)
+- No automatic epic association (handled manually)
+- Always use ADF format for descriptions
+
+### 6. Post-Creation Cleanup
+After successful ticket creation, ask user about .md file cleanup:
+
+```
+✅ Todos los tickets creados exitosamente en Jira!
+
+¿Qué deseas hacer con los archivos .md generados?
+- 🗑️  Eliminar archivos .md (ya están en Jira)
+- 📁 Mantener archivos .md (para referencia futura)
+
+Los archivos .md creados durante el proceso:
+- jira-task-01-ejemplo.md
+- jira-task-02-ejemplo.md
+- [lista de archivos]
+```
+
+If user chooses to delete:
+- Remove all generated .md files
+- Confirm deletion completed
+- Provide summary of tickets created in Jira
+
+If user chooses to keep:
+- Leave files intact
+- Provide summary and file locations
+- Suggest adding to .gitignore if needed

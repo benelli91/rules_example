@@ -1,0 +1,176 @@
+---
+description: Generate atomic JIRA tasks when development plan tasks need to be converted to JIRA tickets
+globs: *.mdc
+---
+
+# JIRA Task Generator Assistant
+
+<version>2.2.0</version>
+
+## Context
+- When user requests converting development plan tasks into JIRA tickets
+- Tasks must be atomic and well-defined for individual JIRA tickets
+- Each task should be implementable independently
+- Output format: Markdown (.md) file ready for Jira API integration
+- Supports two creation formats: Parent Story + Tasks or Individual Story
+
+## Requirements
+
+🎯 **Task Atomicity**: Break down complex tasks into smaller, independent units that can be completed in a single sprint
+
+📝 **Complete Task Definition**: For each JIRA task, provide all required fields:
+
+<required>
+- **¿Qué hay que hacer?**: Clear, specific description of the task/feature to implement
+- **¿Cómo se va a hacer?**: Technical approach, implementation strategy, and key steps
+- **¿Por qué se va a hacer?**: Business justification, user value, or technical necessity
+- **¿Dependencias?**: Prerequisites, blocked tasks, or required resources
+- **DoD (Definition of Done)**: Specific, measurable acceptance criteria
+</required>
+
+🔧 **Technical Context**: Include relevant technical details for Go hexagonal architecture patterns when applicable
+
+🚨 **Dependency Management**: Clearly identify task dependencies to enable proper sprint planning
+
+📄 **Output Format**: Generate structured .md file with task definitions
+
+⏱️ **No Time Estimation**: Omit time/effort estimations from task definitions
+
+🎭 **Creation Format Compatibility**: Structure content to support both:
+- **Format 1**: Parent Story + individual Tasks (each "¿Cómo?" item becomes a Task)  
+- **Format 2**: Single comprehensive Story (all content in one issue)
+
+🔗 **Jira Integration Workflow**: After generating .md file, offer direct ticket creation via 9002-jira-api-integration
+
+## Markdown Output Format
+
+Generate `.md` file with following structure for each task:
+
+```markdown
+# Ticket JIRA: [Task Title]
+
+## ¿Qué hay que hacer?
+[Clear, specific description]
+
+## ¿Cómo se va a hacer?
+- [Technical step 1]
+- [Technical step 2]
+- [Technical step 3]
+
+## ¿Por qué se va a hacer?
+[Business justification and value]
+
+## Dependencias
+- [Dependency 1]
+- [Dependency 2] 
+
+## DoD (Definition of Done)
+- [ ] [Acceptance criteria 1]
+- [ ] [Acceptance criteria 2]
+- [ ] [Acceptance criteria 3]
+
+---
+```
+
+## Integrated Workflow with Jira Creation
+
+After generating the .md file, always offer Jira ticket creation:
+
+### Step 1: Generate .md file
+Create structured task definition following the format above
+
+### Step 2: Offer Jira Integration
+```
+✅ Archivo [filename].md generado exitosamente!
+
+¿Deseas crear estos tickets en Jira ahora?
+- ✅ Sí, crear tickets usando 9002-jira-api-integration
+- ❌ No, solo mantener el archivo .md
+
+Si eliges "Sí", procederé automáticamente con:
+1. Verificación de variables de entorno de Jira
+2. Selección de formato (Historia padre + tasks vs Story individual)
+3. Selección de proyecto
+4. Creación de tickets
+```
+
+### Step 3: Execute 9002 Integration (if user accepts)
+- Automatically transition to 9002-jira-api-integration rule
+- Use the generated .md file as input
+- Follow standard 9002 workflow for ticket creation
+
+## Examples
+
+<example>
+Output file: `jira-task-kyc-validation.md`
+
+```markdown
+# Ticket JIRA: Implementar validación de documentos KYC
+
+## ¿Qué hay que hacer?
+Crear endpoint POST /kyc/documents/validate para validar documentos de identidad
+
+## ¿Cómo se va a hacer?
+- Crear entity Document en internal/domain/validation/entity/
+- Implementar usecase ValidateDocument en internal/domain/validation/usecase/
+- Crear HTTP handler en internal/domain/validation/delivery/http.go
+- Integrar servicio externo de validación con circuit breaker
+
+## ¿Por qué se va a hacer?
+Cumplir con requerimientos regulatorios de KYC para validación automática de documentos
+
+## Dependencias
+- Integración con servicio externo de validación de documentos configurada
+- Esquema de base de datos para documentos creado
+
+## DoD (Definition of Done)
+- [ ] Endpoint responde correctamente a requests válidos
+- [ ] Validación de input parameters implementada
+- [ ] Tests unitarios cubren casos happy path y error
+- [ ] Circuit breaker funciona ante fallas del servicio externo
+- [ ] Documentación de API actualizada
+
+---
+```
+
+**After file generation, offer Jira integration:**
+```
+✅ Archivo jira-task-kyc-validation.md generado exitosamente!
+
+¿Deseas crear estos tickets en Jira ahora?
+- ✅ Sí, crear tickets usando 9002-jira-api-integration
+- ❌ No, solo mantener el archivo .md
+```
+
+**If user selects "Sí":**
+Automatically proceed with 9002-jira-api-integration workflow:
+1. ✅ Variables de entorno verificadas
+2. "¿Cómo deseas crear la tarea? Opción 1: Historia padre + tasks, Opción 2: Story individual"
+3. "¿Para qué proyecto? (ej: KYC-ENF, PAYMENTS, USERS)"
+4. Ejecutar creación de tickets en Jira
+</example>
+
+<example type="invalid">
+```markdown
+# Ticket JIRA: Mejorar el sistema
+
+## ¿Qué hay que hacer?
+Hacer que el sistema funcione mejor
+
+## ¿Cómo se va a hacer?
+- Optimizando el código
+
+## ¿Por qué se va a hacer?
+Para que funcione mejor
+
+## Dependencias
+- Ninguna
+
+## DoD (Definition of Done)
+- [ ] Que funcione mejor
+
+---
+```
+
+❌ Invalid because: Lacks specificity, technical details, measurable criteria, and clear business value
+</example>

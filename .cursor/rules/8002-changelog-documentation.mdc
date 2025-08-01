@@ -1,0 +1,120 @@
+---
+description: Format changelog entries when documenting changes to maintain consistency
+globs: CHANGELOG.md
+---
+
+<version>1.0.0</version>
+
+# Changelog Documentation
+
+## Context
+- When documenting changes in CHANGELOG.md
+- For release notes and version tracking
+- Following Keep a Changelog format with Semantic Versioning
+
+## Requirements
+
+### 📋 **Structure Format** (Keep a Changelog Principles)
+- Use `## [version] - YYYY-MM-DD` for released versions (ISO 8601 date format)
+- Use `## [Unreleased]` at top for tracking upcoming changes
+- Order versions from newest to oldest (latest version first)
+- Include semantic version format: `[MAJOR.MINOR.PATCH]`
+- Make versions and sections linkable
+- Group same types of changes together
+- Display release date for each version
+- **Add GitHub links at bottom**: Link versions to releases/compare URLs for easy navigation
+
+### 🏷️ **Entry Categories** (Keep a Changelog Standard)
+- **Added**: New features and capabilities
+- **Changed**: Changes in existing functionality
+- **Deprecated**: Soon-to-be removed features
+- **Removed**: Now removed features
+- **Fixed**: Any bug fixes
+- **Security**: In case of vulnerabilities
+- **Documentation**: Documentation updates (project-specific)
+- **Infrastructure**: CI/CD, deployment, and infrastructure changes (project-specific)
+
+### ✍️ **Writing Style**
+- Use past tense for all entries
+- Start entries with action verbs (Added, Modified, Enhanced, Fixed, etc.)
+- Be specific and concise
+- Include context for business impact when relevant to KYC enforcement
+- Reference domain layers when applicable (enforcement, notification, configuration, etc.)
+
+### 🔧 **Technical References**
+- Reference specific components: handlers, services, repositories
+- Include HTTP status codes when relevant (HTTP 204, HTTP 500, etc.)
+- Mention database-related changes explicitly
+- Reference configuration changes by environment when applicable
+
+### 🔗 **GitHub Links Standard**
+- Add reference links at bottom of changelog file
+- Format: `[version]: https://github.com/owner/repo/compare/prev...version`
+- Use `compare` for version diffs and `releases/tag` for initial releases
+- Include `[Unreleased]: ...compare/latest...HEAD` for current development
+
+### 🚨 **Antipatterns to Avoid**
+- Never use commit log diffs as changelog entries (full of noise and merge commits)
+- Don't ignore deprecations - always list what will be removed
+- Don't use confusing date formats - stick to ISO 8601 (YYYY-MM-DD)
+- Avoid generic entries like "bug fixes" without specifics
+
+### ⚡ **Special Cases**
+- Mark yanked releases: `## [0.1.5] - 2025-01-15 [YANKED]`
+- Always mention breaking changes prominently
+- Include migration notes for deprecated features when relevant
+
+## Examples
+
+<example>
+## [Unreleased]
+
+### Added
+- Added support for returning HTTP 204 (No Content) when no operations need to be executed
+- Added new error type `NoOperationsError` for handling cases with empty operation lists
+
+### Changed
+- Enhanced enforcement handler to properly handle cases where no operations are required
+
+### Deprecated
+- Policy approval legacy format will be removed in v2.0.0
+
+### Fixed
+- Fixed environment variables for database connection in production and staging configurations
+- Resolved database connection configuration issues across environments
+
+## [1.0.1] - 2025-01-15
+
+### Added
+- Added initial database migration scripts for staging and production environments
+
+### Changed
+- Modified policy approval scope name to comply with Fury platform length restrictions
+
+### Security
+- Updated authentication middleware to prevent token replay attacks
+
+[Unreleased]: https://github.com/owner/repo/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/owner/repo/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/owner/repo/releases/tag/v1.0.0
+</example>
+
+<example type="invalid">
+## [1.0.1] - 01/15/2025 ❌ Wrong date format
+
+### Added ❌ Vague and generic entries
+- Added stuff
+- New feature  
+- Some changes
+
+### Changed ❌ Not descriptive enough
+- Modified things
+- Updated code
+- Made improvements
+
+### Bug Fixes ❌ Invalid category name
+- Fixed bugs
+- Commit: a1b2c3d - Fix issue ❌ Using commit messages directly
+
+❌ Missing GitHub reference links at bottom
+</example>

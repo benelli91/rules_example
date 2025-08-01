@@ -1,0 +1,245 @@
+---
+description: Use PLAN and ACT modes when developing to ensure controlled code changes - ONLY when explicitly mentioned with @2001-plan-vs-act.mdc
+globs: "**/*"
+alwaysApply: false
+---
+
+# Plan vs Act Methodology
+
+## Context
+This methodology establishes two distinct modes of operation to ensure controlled, deliberate code changes with explicit user approval before any modifications are made to the codebase. Enhanced with versioning, extended commands, security validations, and comprehensive metrics tracking.
+
+**Activation**: This rule is activated ONLY when explicitly mentioned in chat with `@2001-plan-vs-act.mdc`. Use this when you need controlled, step-by-step development with explicit approval before code changes.
+
+## Requirements
+
+### Core Operating Modes
+- **PLAN Mode**: Collaborative planning phase where no code changes are made
+- **ACT Mode**: Execution phase where approved changes are implemented
+- Always start in PLAN mode for every new request
+- Display current mode at the beginning of each response: `# Mode: PLAN` or `# Mode: ACT`
+
+### PLAN Mode Rules
+- Gather all necessary information before proposing changes
+- Work with the user to define a complete, detailed plan
+- Ask questions about any unresolved aspects
+- Output the full updated plan in every response
+- Do NOT make any code changes while in PLAN mode
+- Remind user they need to approve the plan if they request actions
+
+### ACT Mode Rules
+- Execute changes based on the approved plan
+- Follow the plan exactly without deviations
+- Implement modifications systematically
+- Return to PLAN mode after completing the execution
+
+### Mode Transitions
+- Move to ACT mode ONLY when user explicitly types "ACT"
+- Return to PLAN mode automatically after each response
+- Return to PLAN mode immediately when user types "PLAN"
+- No automatic mode switching based on context or assumptions
+
+### Plan Storage and Versioning
+- Plans are automatically saved to `.cursor/plans/` directory
+- Each plan modification creates a new version (v1, v2, v3...)
+- Maintain last 10 versions per plan with metadata
+- Plans stored as JSON with timestamp, author, and change description
+- `.cursor/plans/` directory should be added to .gitignore
+
+### Extended Commands
+
+#### Plan Management Commands
+- `PLAN v2` - Create new version of current plan
+- `PLAN HISTORY` - Show version history of current plan
+- `PLAN ROLLBACK v1` - Revert to specific plan version
+- `PLAN EDIT` - Interactive plan modification mode
+- `PLAN SAVE [name]` - Save current plan with custom name
+- `PLAN LOAD [name]` - Load previously saved plan
+- `PLAN STATUS` - Show current plan status and progress
+- `PLAN ESTIMATE` - Display estimated execution time
+
+#### Execution Commands
+- `ACT` - Execute complete approved plan
+- `ACT STEP N` - Execute only specific step N
+- `ACT RANGE 2-5` - Execute steps 2 through 5
+- `ACT --dry-run` - Simulate execution without making changes
+- `CONFIRM DANGEROUS` - Confirm execution of dangerous operations
+
+#### Metrics Commands
+- `PLAN STATS` - Show execution statistics and metrics
+- `PLAN METRICS` - Display detailed performance analytics
+
+### Security Validations
+
+#### Dangerous Operations Detection
+The system automatically detects and flags these dangerous operations:
+- **File Deletion**: `delete`, `remove`, `rm`, file deletions
+- **Core File Modifications**: `main.go`, `package.json`, `.env`, configuration files
+- **Database Operations**: `DROP`, `TRUNCATE`, `DELETE`, schema changes
+- **Git Operations**: `git revert`, `git reset --hard`, destructive git commands
+- **System Commands**: `run_terminal_cmd`, shell executions, system calls
+- **Critical Configuration**: Environment variables, deployment configs
+
+#### Security Protections
+- Dangerous operations require explicit `CONFIRM DANGEROUS` command
+- Automatic backup of files before destructive changes
+- Mandatory dry-run for critical operations
+- Rollback capability for destructive changes
+- Warning prompts with impact assessment
+
+### Metrics and Tracking
+
+#### Tracked Metrics
+- Execution time: estimated vs actual per step
+- Success/failure rates by plan type
+- Average plan complexity and execution time
+- Most common failure points and error types
+- Plan modification frequency and patterns
+
+#### Metrics Display Format
+```
+PLAN STATS:
+┌─────────────────┬─────────┬─────────┬─────────┐
+│ Plan Type       │ Total   │ Success │ Avg Time│
+├─────────────────┼─────────┼─────────┼─────────┤
+│ Refactoring     │ 15      │ 87%     │ 12 min  │
+│ Feature Add     │ 8       │ 100%    │ 25 min  │
+│ Bug Fix         │ 23      │ 96%     │ 7 min   │
+└─────────────────┴─────────┴─────────┴─────────┘
+
+Progress: ████████░░ 80% (Step 4/5)
+Estimated: 15 min | Elapsed: 12 min | Remaining: ~3 min
+```
+
+## Examples
+
+### ✅ Good - PLAN Mode with Versioning
+```
+# Mode: PLAN
+
+## PLAN v2 (Updated: 2024-01-15 14:30)
+Changes from v1: Added error handling, simplified step 3
+
+1. Extract authentication logic from handlers into separate service
+2. Create AuthService interface and implementation  
+3. Update dependency injection (simplified approach)
+4. Add comprehensive error handling
+5. Add unit tests for new AuthService
+
+Estimated time: 25 minutes
+Risk level: Medium (modifies core authentication)
+
+To proceed: type "ACT" or "ACT --dry-run" for simulation
+To modify: type "PLAN EDIT"
+```
+
+### ✅ Good - Extended Command Usage
+```
+User: "ACT STEP 3"
+
+# Mode: ACT
+
+Executing Step 3 only: Update dependency injection...
+⚠️  Dangerous operation detected: Modifying main.go
+Type "CONFIRM DANGEROUS" to proceed or "PLAN" to return to planning.
+
+User: "CONFIRM DANGEROUS"
+
+✅ Step 3 completed successfully (2.3 minutes)
+Progress: ███░░░░░░░ 30% (Step 3/5 completed)
+
+# Mode: PLAN
+
+Step 3 executed. Remaining steps: 4, 5
+Continue with "ACT RANGE 4-5" or modify plan?
+```
+
+### ✅ Good - Plan Loading and Saving
+```
+# Mode: PLAN
+
+User: "PLAN SAVE auth-refactor-final"
+✅ Plan saved as "auth-refactor-final" in .cursor/plans/
+
+User: "PLAN LOAD auth-refactor-final"
+✅ Loaded plan "auth-refactor-final" (v3, saved 2024-01-15)
+
+Current plan ready for execution.
+```
+
+### ✅ Good - Security Warning
+```
+# Mode: ACT
+
+⚠️  DANGEROUS OPERATION DETECTED ⚠️
+Step 2 contains: git reset --hard HEAD~3
+This will permanently delete 3 commits!
+
+Affected files: 15 files, including main.go, database/schema.sql
+Backup created: .cursor/backups/2024-01-15-14-30/
+
+Type "CONFIRM DANGEROUS" to proceed or "PLAN" to reconsider.
+```
+
+### ✅ Good - Metrics Display
+```
+# Mode: PLAN
+
+User: "PLAN STATS"
+
+EXECUTION METRICS:
+┌─────────────────┬─────────┬─────────┬─────────┬──────────┐
+│ Plan Type       │ Total   │ Success │ Avg Time│ Last Run │
+├─────────────────┼─────────┼─────────┼─────────┼──────────┤
+│ Refactoring     │ 15      │ 87%     │ 12 min  │ 2h ago   │
+│ Feature Add     │ 8       │ 100%    │ 25 min  │ 1d ago   │
+│ Bug Fix         │ 23      │ 96%     │ 7 min   │ 30m ago  │
+│ Database        │ 5       │ 60%     │ 18 min  │ 3d ago   │
+└─────────────────┴─────────┴─────────┴─────────┴──────────┘
+
+PERFORMANCE TRENDS:
+Success Rate: ████████░░ 89% (↑ 5% this week)
+Avg Planning Time: 8 minutes
+Avg Execution Time: 14 minutes
+
+COMMON FAILURE POINTS:
+1. Database migrations (40% of failures)
+2. Import path changes (25% of failures)
+3. Test compilation errors (20% of failures)
+```
+
+### ❌ Bad - Making changes in PLAN mode
+```
+# Mode: PLAN
+
+I'll create the auth service for you...
+
+[Makes code changes] ← WRONG - Should not change code in PLAN mode
+```
+
+### ✅ Good - Plan History
+```
+# Mode: PLAN
+
+User: "PLAN HISTORY"
+
+PLAN HISTORY for "auth-refactor":
+┌─────────┬─────────────────────┬────────────────────────────────┐
+│ Version │ Modified            │ Changes                        │
+├─────────┼─────────────────────┼────────────────────────────────┤
+│ v3      │ 2024-01-15 14:30   │ Added error handling           │
+│ v2      │ 2024-01-15 13:45   │ Simplified dependency injection│
+│ v1      │ 2024-01-15 13:20   │ Initial plan created           │
+└─────────┴─────────────────────┴────────────────────────────────┘
+
+Current: v3 | Use "PLAN ROLLBACK v2" to revert
+```
+
+### Plan Structure Requirements
+- Clearly numbered steps or phases
+- Specific actions to be taken with file paths
+- Expected outcomes for each step
+- Time estimates per step
+- Risk assessment (Low/Medium/High)
+- Dependencies between steps
+- Rollback procedures for dangerous operations

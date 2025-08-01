@@ -1,0 +1,45 @@
+---
+description: Generate release branch and changelog when GitHub milestone URL provided
+globs: **/*.md, **/*.go, .cursor/rules/*.mdc
+---
+
+# GitHub Release Workflow from Milestone
+
+## Context
+- User provides GitHub milestone URL requesting release generation
+- Keywords: "release", "generate release", "milestone", "create release"
+- Prerequisites: Updated develop branch, GitHub CLI installed and authenticated
+- Uses GitHub CLI exclusively for GitHub connections
+
+## Requirements
+- 🔍 **Detect milestone URL pattern**: `https://github.com/*/milestones/*`
+- ✅ **Validate develop branch**: Ensure develop is up-to-date with origin
+- 📝 **Request version name**: Ask for version in format `v1.x.x`
+- 🌿 **Create release branch**: Generate `release/v1.x.x` from develop
+- 📋 **Generate CHANGELOG entry**: Extract milestone data via GitHub CLI and summarize changes
+- 🔧 **Use GitHub CLI only**: All GitHub interactions via `gh` commands
+
+## Examples
+
+<example>
+User: "Generate release from https://github.com/owner/repo/milestones/5"
+
+Response:
+I'll generate a release from the provided milestone. First, what version number should I use? (format: v1.x.x)
+
+Once confirmed, I'll:
+1. Validate develop branch is updated
+2. Create release/v1.x.x branch from develop
+3. Fetch milestone data: `gh api repos/owner/repo/milestones/5`
+4. Extract closed issues/PRs from milestone
+5. Generate CHANGELOG.md entry with milestone summary
+6. Commit changelog updates to release branch
+</example>
+
+<example type="invalid">
+User: "Create release"
+Response: Please provide GitHub milestone URL for release generation.
+
+User: "Release from milestone 5"
+Response: Please provide full GitHub milestone URL (https://github.com/owner/repo/milestones/5).
+</example>
